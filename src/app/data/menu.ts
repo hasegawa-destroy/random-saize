@@ -9,7 +9,7 @@ export const menus: Menu[] = [
     { number: "1305", name: "田舎風ミネストローネ", price: 300 },
     { number: "1307", name: "たまねぎのズッパ", price: 300 },
     { number: "1401", name: "辛味チキン", price: 300 },
-    { number: "1402", name: "アロスティチーニ（ラムの串焼き、2本）", price: 400 },
+    { number: "1402", name: "アロスティチーニ（ラムの串焼き）", price: 400 },
     { number: "1403", name: "ほうれん草のソテー", price: 200 },
     { number: "1404", name: "ポップコーンシュリンプ", price: 300 },
     { number: "1405", name: "エスカルゴのオーブン焼き", price: 400 },
