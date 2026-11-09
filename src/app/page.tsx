@@ -1,12 +1,17 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { menus } from "./data/menu";
+import BudgetDialog from "./components/budgetDialog";
 
 export default function Home() {
   const [randomNumbers, setRandomNumbers] = useState("");
   const [selectedMenus, setSelectedMenus] = useState<typeof menus>([]);
-  const [isStopped, setIsStopped] = useState(false);
+
+  const [budget, setBudget] = useState<number | null>(null);
+  const [isStopped, setIsStopped] = useState(true);
+  const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(true);
 
   // 直近の4桁を保持
   const lastDigits = useRef("");
@@ -14,52 +19,71 @@ export default function Home() {
   // 追加済みのメニュー番号
   const foundNumbers = useRef(new Set<string>());
 
-  const totalPrice = selectedMenus.reduce((total, menu) => total + menu.price, 0);
+  const totalPrice = selectedMenus.reduce(
+    (total, menu) => total + menu.price,
+    0
+  );
 
   const isHighlighted = (index: number) => {
     return selectedMenus.some((menu) => {
       let start = randomNumbers.indexOf(menu.number);
 
       while (start !== -1) {
-        // 4桁の番号の範囲内か判定
         if (index >= start && index < start + menu.number.length) {
           return true;
         }
 
-        // 次の出現位置を検索
         start = randomNumbers.indexOf(menu.number, start + 1);
       }
 
       return false;
     });
   };
-
   const handleReset = () => {
-    // 表示をリセット
     setRandomNumbers("");
     setSelectedMenus([]);
 
-    // 停止状態をリセット
-    setIsStopped(false);
-
-    // refもリセット
     lastDigits.current = "";
     foundNumbers.current.clear();
+
+    setIsStopped(false);
+  };
+
+  const handleBack = () => {
+    setIsStopped(true);
+    setIsBudgetDialogOpen(true);
+  };
+
+  const handleBudgetConfirm = (value: number) => {
+    // 抽選結果をリセット
+    setRandomNumbers("");
+    setSelectedMenus([]);
+
+    // 直近4桁と追加済み番号もリセット
+    lastDigits.current = "";
+    foundNumbers.current.clear();
+
+    // 新しい予算を設定
+    setBudget(value);
+
+    // ダイアログを閉じる
+    setIsBudgetDialogOpen(false);
+
+    // 抽選を再開
+    setIsStopped(false);
   };
 
   useEffect(() => {
-    if (isStopped) return;
+    if (isStopped || isBudgetDialogOpen || budget === null) return;
 
     const timer = setInterval(() => {
       const digit = String(Math.floor(Math.random() * 10));
 
-      // 直近4桁だけを更新
       const nextDigits = (lastDigits.current + digit).slice(-4);
       lastDigits.current = nextDigits;
 
       setRandomNumbers((prev) => prev + digit);
 
-      // 4桁そろったら照合
       if (nextDigits.length === 4) {
         const menu = menus.find(
           (item) => item.number === nextDigits
@@ -73,80 +97,115 @@ export default function Home() {
     }, 100);
 
     return () => clearInterval(timer);
-  }, [isStopped]);
+  }, [isStopped, isBudgetDialogOpen, budget]);
 
   useEffect(() => {
-    if (totalPrice >= 2000) {
+    if (budget !== null && totalPrice >= budget) {
       setIsStopped(true);
     }
-  }, [totalPrice]);
+  }, [totalPrice, budget]);
 
   return (
-    <div className="h-dvh flex flex-col overflow-hidden">
-      {/* ヘッダー */}
-      <div className="w-full shrink-0 py-6 border-b text-center">
-        <p>ランダム注文サイゼリヤ</p>
-      </div>
+    <div className="h-dvh flex flex-col overflow-hidden bg-background">
 
-      <div className="w-full flex-1 min-h-0 flex flex-col gap-2 px-4 py-4">
-        <div className="p-2 border rounded-xl">
-          <div className="">
-            <p>予算：{"2000"}円</p>
-            <p>現在の金額：{totalPrice}円</p>
+      {/* ヘッダー */}
+      <header className="w-full shrink-0 py-6 text-center bg-primary">
+        <p className="text-white font-bold text-lg">
+          ランダム注文サイゼリヤ
+        </p>
+      </header>
+
+      <main className="w-full flex-1 min-h-0 flex flex-col gap-3 px-4 py-4">
+
+        {/* 予算・金額カード */}
+        <section className="shrink-0 p-3 bg-surface border border-border rounded-xl">
+
+          <div className="flex justify-between items-center">
+            <p>予算：{budget?.toLocaleString() ?? "-"}円</p>
+            <p>現在の金額：{totalPrice.toLocaleString()}円</p>
           </div>
-          <hr className="my-2 border-gray-300" />
+
+          <hr className="my-3 border-border" />
+
+          {/* ランダム数字 */}
           <div className="max-h-32 overflow-y-auto break-all">
-            <p>
+            <p className="leading-relaxed tracking-wider">
               {randomNumbers.split("").map((digit, index) => (
                 <span
                   key={index}
-                  className={isHighlighted(index) ? "text-red-500" : ""}
+                  className={isHighlighted(index) ? "text-accent font-bold" : ""}
                 >
                   {digit}
                 </span>
               ))}
             </p>
           </div>
-        </div>
+        </section>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 border rounded-xl">
+        {/* メニュー一覧 */}
+        <section className="flex-1 min-h-0 overflow-y-auto p-3 bg-menu-area border border-border rounded-xl">
+
+          <div className="flex justify-between items-center mb-3">
+            <p className="font-bold">
+              注文メニュー
+            </p>
+            <p className="text-sm text-muted">
+              {selectedMenus.length}品
+            </p>
+          </div>
+
           {selectedMenus.map((menu) => (
             <article
               key={menu.number}
-              className="flex justify-between items-center rounded-sm border p-4 mb-2"
+              className="flex justify-between items-center rounded-lg border border-border bg-menu-card p-4 mb-2"
             >
               <div className="flex-1">
-                <p className="font-bold">{menu.number}</p>
-                <p className="text-sm">{menu.name}</p>
+                <p className="font-bold text-muted">
+                  {menu.number}
+                </p>
+                <p className="text-sm">
+                  {menu.name}
+                </p>
               </div>
-              <p className="whitespace-nowrap">{menu.price}円</p>
+
+              <p className="whitespace-nowrap font-medium">
+                {menu.price.toLocaleString()}円
+              </p>
             </article>
           ))}
+
+          {selectedMenus.length === 0 && (
+            <p className="text-center text-muted text-sm py-8">
+              メニューが追加されるまでお待ちください
+            </p>
+          )}
+        </section>
+
+        {/* ボタン */}
+        <div className="shrink-0 flex flex-col gap-2">
+
+          <button
+            onClick={handleReset}
+            className="w-full py-3 rounded-xl bg-primary text-white font-bold border border-primary active:opacity-80"
+          >
+            やりなおす
+          </button>
+
+          <button
+            onClick={handleBack}
+            className="w-full py-3 rounded-xl bg-surface text-text border border-border font-medium"
+          >
+            もどる
+          </button>
+
         </div>
 
-        <div className="shrink-0 flex flex-col justify-center gap-2">
-          <button onClick={handleReset} className="py-2 rounded-2xl border">やりなおす</button>
-          <button className="py-2 rounded-2xl border">もどる</button>
-        </div>
-      </div>
+        <BudgetDialog
+          isOpen={isBudgetDialogOpen}
+          onConfirm={handleBudgetConfirm}
+        />
 
-      {/* <div className="flex justify-center">
-        <p>予算内でランダムなメニューを注文</p>
-      </div>
-
-      <div className="w-full">
-        <div className="flex justify-center">
-          <p>予算：</p>
-          <input
-            type="number"
-            className="ml-2 px-1 border text-right"
-          />
-          <p className="ml-1">円</p>
-        </div>
-        <div className="flex justify-center">
-          <button className="px-24 py-2 rounded-2xl border">注文表作成</button>
-        </div>
-      </div> */}
+      </main>
     </div>
   );
 }
